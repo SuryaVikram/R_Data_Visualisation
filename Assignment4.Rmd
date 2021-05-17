@@ -1,0 +1,164 @@
+---
+title: "Assignment 4"
+author: "Surya Vikram BV"
+date: "09/04/2021"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+#packages for fonts Not used
+# install.packages('extrafont')
+# library(extrafont)
+# font_import()
+```
+
+```{r libraries}
+library(dplyr)
+library(ggplot2)
+library(countrycode)
+library(tidyr)
+library(ggthemes)
+```
+
+```{r import data set}
+pisa<-read.csv("pisa.csv",fileEncoding = "UTF-8-BOM")
+```
+
+```{r}
+#filter by year 2018
+pisa2018<-pisa%>%filter(TIME=='2018')
+```
+
+```{r}
+#Populate country codes with country names, also included custom match for certain countries
+pisa2018$Country = countrycode(pisa2018$LOCATION,origin = "iso3c",destination =  'country.name', custom_match = c('OAVG' = 'OECD - Average','CZE'='Czech Republic','SVK'='Slovak Republic'))
+```
+
+
+```{r}
+#Create a Boys Score column group by country and get min of value as Boys score is consistently lower than girls for all countries
+pisa2018<-pisa2018%>% group_by(Country)%>%mutate(BoysScore=min(Value))
+pisa2018<-pisa2018%>% filter(SUBJECT!='TOT')
+
+```
+
+```{r}
+#Create a dataframe to hold colour for the x axis text, contains one column text color based on the condition, red for ireland, black for oecd average, grey for others
+pisa2018Colour<- pisa2018%>%arrange(BoysScore)%>%select(Country) %>%
+  distinct() %>%mutate(textColour=if_else(Country == "OECD - Average", "black",if_else(Country == "Ireland","red","#565252")))
+```
+```{r}
+#Plot
+ggplot(pisa2018 , aes(x = reorder(Country,BoysScore), y= Value,shape = SUBJECT, colour = SUBJECT)) +
+  geom_segment(aes(xend = Country,yend=BoysScore),y=340, colour="white", size=0.15, linetype = "solid")+#segment for x grid lines, adding these before the geom points and line
+  geom_line(aes(group = Country), colour = "grey", size=0.5) + # connecting line between boys and girls score
+  geom_point( size = 3.0, aes(colour = SUBJECT),stroke=0.80)+ # points
+  scale_shape_manual(name = "",labels=c("Boys","Girls"),values = c(16, 23)) +#custom shapes
+  scale_colour_manual(name = "",labels=c("Boys","Girls"),values = c( "#4B6C86","#4B6C86"))+ #custom colour
+  geom_point(data = subset(pisa2018, SUBJECT == 'GIRL'), shape=5,color='white', size=3.4)+#white background for the girl points
+  geom_point(data = subset(pisa2018, SUBJECT == 'GIRL'), shape=23,color='#4B6C86',fill='#E4EDF2',stroke=0.80, size=3.1)+#superimposing on the original point hide grid lines, stroke to increase width
+  geom_point(data = subset(pisa2018, SUBJECT == 'BOY'), shape=1,color='white', size=3.1)+#white background for boy points
+  
+  geom_point(data = subset(pisa2018, Country == 'Ireland'),mapping =  aes(x=Country,y=Value), shape=c(16,23),color='red', fill = "red", size = c(3,3.6))+#red points for Ireland
+  geom_point(data = subset(pisa2018, Country == 'OECD - Average'),mapping =  aes(x=Country,y=Value), shape=c(16,23),color='black', fill = "black", size = c(3,3.6))+#black points for average
+  annotate(geom = 'segment', y = Inf, yend = Inf, color = '#498EBF', x = -Inf, xend = Inf, size = 1) +#blue line at top of plot
+  scale_y_continuous(limits = c(340,565), breaks = seq(340,560,by=20))+#y scale 
+  
+  
+  labs(title= "Reading Performance (PISA)",subtitle = "Boys/Girls, Mean score, 2018",caption = "Source: PISA: Programme for International Student Assessment") +#titles, subtitle and caption
+  scale_x_discrete(expand = c(0,5,0,1.25))+#adjust poisition
+  
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        panel.grid.major.x =element_blank(),
+        panel.grid.minor.x = element_blank(),
+        #panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.ticks = element_blank(),
+        panel.background = element_rect(fill = "#deeaf1"),#background colour
+        panel.border = element_blank(),
+        axis.text.y = element_text(hjust = 2,vjust = -0.5, size=8,margin=margin(-1,-35,0,3)),#adjusted margins to get labels into the plot
+        axis.text.x = element_text(family="serif",angle = 45, vjust = 1, hjust =1,color = pisa2018Colour$textColour),#colours from created dataframe
+        plot.title = element_text(color="black", face='bold',size=11,vjust = 0,hjust =0.03),
+        plot.subtitle = element_text(color = "black", face='bold',size=8,hjust =0.40, vjust = 8),
+        plot.caption=element_text(size=7,hjust = 1, face='bold',vjust = 207),
+        legend.direction = "horizontal",
+        legend.key=element_blank(),
+        legend.position= c(0.1,-0.29),#adjust legend position
+        legend.title = element_blank())
+
+
+
+```
+```{r Part 3}
+#filter by location to get dataframe
+plot2<-pisa%>%filter(LOCATION=='AUS'|LOCATION=='IRL'|LOCATION=='USA')
+```
+```{r}
+#populate country names from Location code
+plot2$Country = countrycode(plot2$LOCATION,origin = "iso3c",destination =  'country.name')
+```
+
+```{r}
+#Filter by TOT, and modify it as average score
+plot2<-plot2%>% filter(SUBJECT=='TOT')
+plot2$SUBJECT[plot2$SUBJECT == "TOT"] <- "Average_Score"
+```
+
+
+```{r}
+#Plot 2
+gplot_2<-ggplot(plot2, aes(x = TIME, y=Value, shape = SUBJECT, color = Country))+ #x axis time, y axis value, shape by subject- same for all, colour by country 
+  geom_line(size = 0.8) +#line to indicate trend
+  geom_segment(aes(xend = TIME), yend = 480, colour="white", size=0.15, linetype = "solid") +#x axis grid lines
+  
+  geom_point(color = "#4B6C86", fill = "#4B6C86", size = 4) +# point with same color as above
+  
+  labs(title= "Reading Performance (PISA)",subtitle = "Comparison of Average score", caption = "Source: PISA: Programme for International Student Assessment") +
+  
+  scale_shape_manual(values = c(16)) + #specifying custom shape
+  scale_fill_manual(values=c("#4B6C86")) +#specifying custom color
+  annotate(geom = 'segment', y = Inf, yend = Inf, color = '#498EBF', x = -Inf, xend = Inf, size = 1) +#blue line at top to maintain theme
+  
+  scale_y_continuous(limits = c(480,540),breaks = seq(480,540,by=20)) +#modified breaks
+  scale_x_continuous(limits = c(2000,2018), breaks = seq(2000,2018,by=3))  +#specified breaks per year
+  
+  scale_color_manual(values = c("#4B6C86", "#4B6C86", "#4B6C86")) +#same color for all countries as depicting average data for comparison
+  
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        panel.grid.major.x =element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.ticks = element_blank(),
+        panel.background = element_rect(fill = "#deeaf1"),
+        plot.margin = margin(14, 7, 7, 1.5),
+        plot.title = element_text(face = "bold",color="black", size=12,vjust = -1,hjust = 0.01, family = "serif"),
+        plot.subtitle = element_text(color = "black", size=7,hjust =0.40, vjust = 6),
+        plot.caption=element_text(size=7,hjust = 1,color = "black", vjust = 197),
+        axis.ticks.y = element_blank(),
+        axis.text.y= element_text(margin = margin(0, 0, 0, 0) ,size = 10, color = "#565252"),
+        axis.text.x= element_text(family="serif",angle=45, size=10, color = "#565252", margin = margin(5, 0, 5, 5) ),
+        strip.text.x = element_text(size=9, face="bold"),
+        strip.background = element_blank(),
+        legend.key=element_blank(),
+        legend.position= c(0.1,-0.20),
+        legend.title = element_blank()#legend at bottom as before
+        
+  ) +
+  facet_grid(cols = vars(Country))#using facet grid to display countries side by side
+
+gplot_2<-gplot_2+guides(color=FALSE)#hides geomline legend
+
+gplot_2
+```
+
